@@ -5,4 +5,5 @@ CONFIG -= qt
 
 SOURCES += main.c
 
-HEADERS +=
+HEADERS += \
+    auxiliary.h
