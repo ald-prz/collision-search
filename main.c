@@ -1,29 +1,56 @@
 #include <stdio.h>
 #include <string.h>
-//#include <openssl/sha.h>
+#include <openssl/sha.h>
+#include <mpi.h>
+#include <unistd.h>
 
 #include "auxiliary.h"
 
 int main(int argc, char *argv[])
 {
-    /*unsigned char ibuf[] = "compute sha1";
-    unsigned char obuf[20];
+    int id, nb_instance, len;
+    char processor_name[MPI_MAX_PROCESSOR_NAME];
+    unsigned char buff[1];
 
-    SHA1(ibuf, strlen((const char*)ibuf), obuf);
+    MPI_Init(&argc, &argv);
+    MPI_Comm_rank(MPI_COMM_WORLD, &id);
+    MPI_Comm_size(MPI_COMM_WORLD, &nb_instance);
+    MPI_Get_processor_name(processor_name, &len);
 
-    int i;
-    for (i = 0; i < 20; i++) {
-        printf("%02x ", obuf[i]);
+    printf("ID:%d/%d\n", id, nb_instance);
+
+    MPI_Status status;
+
+    if (id == 0)
+    {
+        MPI_Recv(&buff, 1, MPI_UNSIGNED_CHAR, MPI_ANY_SOURCE
+                 , MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+
+        printf("From:%d;Received:%d\n", status.MPI_SOURCE, (int)buff[0]);
+
+        MPI_Recv(&buff, 1, MPI_UNSIGNED_CHAR, MPI_ANY_SOURCE
+                 , MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+
+        printf("From:%d;Received:%d\n", status.MPI_SOURCE, (int)buff[0]);
     }
-    printf("\n");*/
+    else if (id == 1)
+    {
+        sleep(3);
 
-    unsigned char one[20] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,255,19};
-    unsigned char two[20] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,0,22};
+        buff[0] = (unsigned char) 10;
 
-    if (is_match(one, two, 1) != 0)
-        printf("yes");
-    else
-        printf("no");
+        MPI_Send(&buff, 1, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
+    }
+    else if (id == 2)
+    {
+        sleep(5);
+
+        buff[0] = (unsigned char) 15;
+
+        MPI_Send(&buff, 1, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
+    }
+
+    MPI_Finalize();
 
     return 0;
 }
