@@ -116,12 +116,12 @@ void process_worker(int process_id, int search_bytes, int match_bits)
             for (i = 1; i < search_bytes; i++)
                 word1[i] = 0;
 
-            // set word_end1 to [byte+1].0.0...0 form
+            // set word_end1 to [byte+1].255.255...255 form
 
             word_end1[0] = word1[0] + 1;
 
             for (i = 1; i < search_bytes; i++)
-                word_end1[i] = 0;
+                word_end1[i] = 255;
 
             /*printf("----word1=[");
             output_word(word1, search_bytes);
@@ -167,7 +167,8 @@ void process_worker(int process_id, int search_bytes, int match_bits)
                     SHA1(word2, search_bytes, digest2);
 
                     if (digest_match(digest1, digest2, match_bits) == 1)
-                        output_collision(filename, search_bytes, word1, word2, digest1, digest2);
+                        if (word_match(word1, word2, search_bytes) != 1)
+                            output_collision(filename, search_bytes, word1, word2, digest1, digest2);
 
 
                     /*output_word(word2, search_bytes);
@@ -214,7 +215,7 @@ void output_collision(const char *filename, int size, unsigned char *word1, unsi
 {
     int i;
 
-    for (i = 0; i < size; i++)
+    /*for (i = 0; i < size; i++)
         printf("%d ", word1[i]);
 
     printf(";");
@@ -232,7 +233,7 @@ void output_collision(const char *filename, int size, unsigned char *word1, unsi
     for (i = 0; i < 20; i++)
         printf("%02x", digest2[i]);
 
-    printf("\n\n");
+    printf("\n\n");*/
 
     FILE *file = fopen(filename, "a");
 
