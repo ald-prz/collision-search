@@ -67,38 +67,69 @@ void process_host()
 
 void process_worker(int search_bytes, int match_bits)
 {
-    unsigned char buff[2];
-    unsigned char *word1, *word2, word_end;
+    unsigned char msg[2];
+    unsigned char *word1, *word2, *word_end;
+    unsigned char digest1[20], digest2[20];
     MPI_Status status;
     int i;
 
-    buff[0] = 1;
+    msg[0] = 1;
     word1 = (unsigned char *) malloc(search_bytes);
+    word2 = (unsigned char *) malloc(search_bytes);
+    word_end = (unsigned char *) malloc(search_bytes);
 
     printf("ID:%d;Start worker\n", id);
 
-    while (buff[0] == 1)
+    while (msg[0] == 1) // the host orders to continue to work
     {
-        MPI_Send(&buff, 0, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
-        MPI_Recv(&buff, 2, MPI_UNSIGNED_CHAR, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-        printf("ID:%d;Status:%d;Work:%d\n", id, (int) buff[0], (int) buff[1]);
+        MPI_Send(&msg, 0, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
+        MPI_Recv(&msg, 2, MPI_UNSIGNED_CHAR, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+        printf("ID:%d;Status:%d;Work:%d\n", id, (int) msg[0], (int) msg[1]);
 
         // set word1 to [byte].0.0...0 form
 
-        word1[0] = buff[1];
+        word1[0] = msg[1];
 
-        for (int i = 1; i < search_bytes; i++)
+        for (i = 1; i < search_bytes; i++)
             word1[i] = 0;
 
         // set word2 = word1 + 1 form
 
-        for (int i = 0; i < search_bytes; i++)
+        for (i = 0; i < search_bytes; i++)
             word2[i] = word1[i];
 
-        word2[search_bytes - 1]++;
+        increment(word2, search_bytes);
+
+        SHA1(word1, search_bytes, digest1);
+        SHA1(word2, search_bytes, digest2);
+
+        if (is_match(digest1, digest2, match_bits))
+        {
+            for (i = 0; i < search_bytes; i++)
+                printf("%d", word1[i]);
+
+            printf(";");
+
+            for (i = 0; i < 20; i++)
+                printf("%d", digest1[i]);
+
+            printf("\n");
+
+            for (i = 0; i < search_bytes; i++)
+                printf("%d", word2[i]);
+
+            printf(";");
+
+            for (i = 0; i < 20; i++)
+                printf("%d", digest2[i]);
+
+            printf("\n\n");
+        }
     }
 
     free(word1);
+    free(word2);
+    free(word_end);
 
     printf("ID:%d;Stop worker\n", id);
 }
