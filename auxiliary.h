@@ -5,9 +5,9 @@ unsigned char mask[8] = {1, 3, 7, 15, 31, 63, 127, 255};
 
 /*!
  * \brief IsMatch Checks partial match of two binary words (assumes sizes of words = 20 bytes)
- * \param one first word
- * \param two second word
- * \param number_of_bits number of least significant bits determing the match
+ * \param one First word
+ * \param two Second word
+ * \param number_of_bits Number of least significant bits determing the match
  * \return 1 if matching, 0 otherwise
  */
 int is_match(unsigned char *one, unsigned char *two, int number_of_bits)
@@ -34,6 +34,31 @@ int is_match(unsigned char *one, unsigned char *two, int number_of_bits)
     }
 
     return 1;
+}
+
+/*!
+ * \brief increment Increments given binary word
+ * \param word Word
+ * \param length Lenght of the given word in bytes
+ */
+void increment(unsigned char *word, int length)
+{
+    int i;
+    int nextFlag = 0;
+
+    word[length - 1]++;
+    if (word[length - 1] == 0)
+        nextFlag = 1;
+
+    for (i = length - 2; i >= 0; i--)
+        if (nextFlag == 1)
+        {
+            word[i]++;
+            if (word[i] != 0)
+                nextFlag = 0;
+        }
+        else
+            break;
 }
 
 #endif // AUXILIARY_H
