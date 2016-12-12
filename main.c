@@ -14,6 +14,7 @@ void process_worker(int process_id, int search_bytes, int match_bits);
 void output_word(unsigned char *word, int size);
 void output_collision(const char *filename, int size, unsigned char *word1, unsigned char *word2, unsigned char *digest1, unsigned char *digest2);
 void rewrite_file(const char *filename);
+void output_runtime(int *runtime, int size);
 
 int main(int argc, char *argv[])
 {
@@ -49,46 +50,96 @@ int main(int argc, char *argv[])
 
 void process_host(int process_id, int process_num)
 {
-    unsigned char buff[2];
+    unsigned char buff_char[2];
+    int buff_int[1];
     unsigned char byte;
+    double time1, time2;
+    int *runtime;
     int i;
     MPI_Status status;
 
-    printf("ID:%d;Start host\n", process_id);
+    time1 = MPI_Wtime();
+
+    //printf("ID:%d;Start host\n", process_id);
 
     byte = 255; // to start from 0
+
+    // sending tasks
 
     do
     {
         byte++;
-        MPI_Recv(&buff, 0, MPI_UNSIGNED_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-        buff[0] = 1;
-        buff[1] = byte;
-        MPI_Send(&buff, 2, MPI_UNSIGNED_CHAR, status.MPI_SOURCE, 0, MPI_COMM_WORLD);
+        MPI_Recv(&buff_char, 0, MPI_UNSIGNED_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+        buff_char[0] = 1;
+        buff_char[1] = byte;
+        MPI_Send(&buff_char, 2, MPI_UNSIGNED_CHAR, status.MPI_SOURCE, 0, MPI_COMM_WORLD);
     }
     while (byte != 254);
 
-    for (i = 0; i < process_num - 1; i++)
+    //printf("ID:%d;Recieving finish\n", process_id);
+
+    // sending finish commands
+
+    for (i = 1; i < process_num; i++)
     {
-        MPI_Recv(&buff, 0, MPI_UNSIGNED_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-        buff[0] = 0;
-        buff[1] = 0;
-        MPI_Send(&buff, 2, MPI_UNSIGNED_CHAR, status.MPI_SOURCE, 0, MPI_COMM_WORLD);
+        MPI_Recv(&buff_char, 0, MPI_UNSIGNED_CHAR, i, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+        buff_char[0] = 0;
+        buff_char[1] = 0;
+        MPI_Send(&buff_char, 2, MPI_UNSIGNED_CHAR, status.MPI_SOURCE, 0, MPI_COMM_WORLD);
     }
 
-    printf("ID:%d;Stop host\n", process_id);
+    //printf("ID:%d;Recieving runtime\n", process_id);
+
+    // recieving runtimes
+
+    runtime = (int *) malloc(sizeof(int) * process_num);
+
+    for (i = 1; i < process_num; i++)
+    {
+        MPI_Recv(&buff_int, 1, MPI_INT, i, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+        runtime[status.MPI_SOURCE] = buff_int[0];
+    }
+
+
+    //printf("ID:%d;Output\n", process_id);
+
+    time2 = MPI_Wtime();
+    runtime[0] = (int) (time2 - time1);
+
+    // output runtimes
+
+    output_runtime(runtime, process_num);
+
+    free(runtime);
+
+    //printf("ID:%d;Stop host\n", process_id);
+}
+
+void output_runtime(int *runtime, int size)
+{
+    FILE *file = fopen("time.txt", "w");
+    int i;
+
+    for (i = 0; i < size; i++)
+        fprintf(file, "Process %d : %d sec\n", i, runtime[i]);
+
+    fclose(file);
 }
 
 void process_worker(int process_id, int search_bytes, int match_bits)
 {
-    unsigned char msg[2];
+    unsigned char buff_char[2];
+    int buff_int[1];
     unsigned char *word1, *word2, *word_end1, *word_end2;
     unsigned char digest1[20], digest2[20];
     MPI_Status status;
+    double time1, time2;
     int i;
     int match;
 
-    msg[0] = 1;
+    time1 = MPI_Wtime();
+
+    buff_char[0] = 1;
     word1 = (unsigned char *) malloc(search_bytes);
     word2 = (unsigned char *) malloc(search_bytes);
     word_end1 = (unsigned char *) malloc(search_bytes);
@@ -99,19 +150,19 @@ void process_worker(int process_id, int search_bytes, int match_bits)
 
     rewrite_file(filename);
 
-    printf("ID:%d;Start worker\n", process_id);
+    //printf("ID:%d;Start worker\n", process_id);
 
-    while (msg[0] == 1) // the host orders to continue to work
+    while (buff_char[0] == 1) // the host orders to continue to work
     {
-        MPI_Send(&msg, 0, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
-        MPI_Recv(&msg, 2, MPI_UNSIGNED_CHAR, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+        MPI_Send(&buff_char, 0, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
+        MPI_Recv(&buff_char, 2, MPI_UNSIGNED_CHAR, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
         //printf("ID:%d;Status:%d;Work:%d\n", id, (int) msg[0], (int) msg[1]);
 
-        if (msg[0] == 1)
+        if (buff_char[0] == 1)
         {
             // set word1 to [byte].0.0...0 form
 
-            word1[0] = msg[1];
+            word1[0] = buff_char[1];
 
             for (i = 1; i < search_bytes; i++)
                 word1[i] = 0;
@@ -187,13 +238,17 @@ void process_worker(int process_id, int search_bytes, int match_bits)
         }
     }
 
+    time2 = MPI_Wtime();
+    buff_int[0] = time2 - time1;
+    MPI_Send(&buff_int, 1, MPI_INT, 0, 0, MPI_COMM_WORLD);
+
     free(word1);
     free(word2);
     free(word_end1);
     free(word_end2);
 
 
-    printf("ID:%d;Stop worker\n", process_id);
+    //printf("ID:%d;Stop worker\n", process_id);
 }
 
 
@@ -214,26 +269,6 @@ void rewrite_file(const char *filename)
 void output_collision(const char *filename, int size, unsigned char *word1, unsigned char *word2, unsigned char *digest1, unsigned char *digest2)
 {
     int i;
-
-    /*for (i = 0; i < size; i++)
-        printf("%d ", word1[i]);
-
-    printf(";");
-
-    for (i = 0; i < 20; i++)
-        printf("%02x", digest1[i]);
-
-    printf("\n");
-
-    for (i = 0; i < size; i++)
-        printf("%d ", word2[i]);
-
-    printf(";");
-
-    for (i = 0; i < 20; i++)
-        printf("%02x", digest2[i]);
-
-    printf("\n\n");*/
 
     FILE *file = fopen(filename, "a");
 
