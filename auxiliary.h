@@ -36,6 +36,17 @@ int is_match(unsigned char *one, unsigned char *two, int number_of_bits)
     return 1;
 }
 
+int full_match(unsigned char *one, unsigned char *two, int number_of_bytes)
+{
+    int i;
+
+    for (i = 0; i < number_of_bytes; i++)
+        if (one[i] != two[i])
+            return 0;
+
+    return 1;
+}
+
 /*!
  * \brief increment Increments given binary word
  * \param word Word
