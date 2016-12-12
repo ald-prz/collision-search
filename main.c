@@ -5,36 +5,39 @@
 #include <mpi.h>
 #include <unistd.h>
 
-#include "auxiliary.h"
+#include "digest_match.h"
+#include "word_match.h"
+#include "increment.h"
 
-void process_host();
-void process_worker(int search_bytes, int match_bits);
+void process_host(int process_id, int process_num);
+void process_worker(int process_id, int search_bytes, int match_bits);
 void output_word(unsigned char *word, int size);
-
-int id, nb_instance;
+void output_collision(const char *filename, int size, unsigned char *word1, unsigned char *word2, unsigned char *digest1, unsigned char *digest2);
+void rewrite_file(const char *filename);
 
 int main(int argc, char *argv[])
 {
     int len;
     char processor_name[MPI_MAX_PROCESSOR_NAME];
+    int process_id, process_num;
 
     MPI_Init(&argc, &argv);
-    MPI_Comm_rank(MPI_COMM_WORLD, &id);
-    MPI_Comm_size(MPI_COMM_WORLD, &nb_instance);
+    MPI_Comm_rank(MPI_COMM_WORLD, &process_id);
+    MPI_Comm_size(MPI_COMM_WORLD, &process_num);
     MPI_Get_processor_name(processor_name, &len);
 
     if (argc < 5)
        printf("Arguments are not provided");
     else
     {
-        if (nb_instance < 2)
+        if (process_num < 2)
             printf("Need atleast 2 processes (1 host+1 worker");
         else
         {
-            if (id == 0)
-                process_host();
+            if (process_id == 0)
+                process_host(process_id, process_num);
             else
-                process_worker(atoi(argv[2]), atoi(argv[4]));
+                process_worker(process_id, atoi(argv[2]), atoi(argv[4]));
         }
     }
 
@@ -44,14 +47,14 @@ int main(int argc, char *argv[])
 }
 
 
-void process_host()
+void process_host(int process_id, int process_num)
 {
     unsigned char buff[2];
     unsigned char byte;
     int i;
     MPI_Status status;
 
-    printf("ID:%d;Start host\n", id);
+    printf("ID:%d;Start host\n", process_id);
 
     byte = 255; // to start from 0
 
@@ -65,7 +68,7 @@ void process_host()
     }
     while (byte != 254);
 
-    for (i = 0; i < nb_instance - 1; i++)
+    for (i = 0; i < process_num - 1; i++)
     {
         MPI_Recv(&buff, 0, MPI_UNSIGNED_CHAR, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
         buff[0] = 0;
@@ -73,10 +76,10 @@ void process_host()
         MPI_Send(&buff, 2, MPI_UNSIGNED_CHAR, status.MPI_SOURCE, 0, MPI_COMM_WORLD);
     }
 
-    printf("ID:%d;Stop host\n", id);
+    printf("ID:%d;Stop host\n", process_id);
 }
 
-void process_worker(int search_bytes, int match_bits)
+void process_worker(int process_id, int search_bytes, int match_bits)
 {
     unsigned char msg[2];
     unsigned char *word1, *word2, *word_end1, *word_end2;
@@ -91,13 +94,12 @@ void process_worker(int search_bytes, int match_bits)
     word_end1 = (unsigned char *) malloc(search_bytes);
     word_end2 = (unsigned char *) malloc(search_bytes);
 
-    char filename[50];
-    sprintf(filename, "collisions_%d_bits_on_%d_bytes_msg_%d", search_bytes, match_bits, id);
+    char filename[60];
+    sprintf(filename, "collisions_%d_bits_on_%d_bytes_msg_%d.csv", match_bits, search_bytes, process_id);
 
-    FILE *file = fopen(filename, "w");
-    fclose(file);
+    rewrite_file(filename);
 
-    printf("ID:%d;Start worker\n", id);
+    printf("ID:%d;Start worker\n", process_id);
 
     while (msg[0] == 1) // the host orders to continue to work
     {
@@ -139,9 +141,7 @@ void process_worker(int search_bytes, int match_bits)
                 // set word_end2 to [byte].255.255...255 form
 
                 if (search_bytes == 1)
-                {
                     word_end2[0] = 255;
-                }
                 else
                 {
                     word_end2[0] = word1[0];
@@ -166,28 +166,8 @@ void process_worker(int search_bytes, int match_bits)
                     SHA1(word1, search_bytes, digest1);
                     SHA1(word2, search_bytes, digest2);
 
-                    if (is_match(digest1, digest2, match_bits) == 1)
-                    {
-                        for (i = 0; i < search_bytes; i++)
-                            printf("%d ", word1[i]);
-
-                        printf(";");
-
-                        for (i = 0; i < 20; i++)
-                            printf("%02x", digest1[i]);
-
-                        printf("\n");
-
-                        for (i = 0; i < search_bytes; i++)
-                            printf("%d ", word2[i]);
-
-                        printf(";");
-
-                        for (i = 0; i < 20; i++)
-                            printf("%02x", digest2[i]);
-
-                        printf("\n\n");
-                    }
+                    if (digest_match(digest1, digest2, match_bits) == 1)
+                        output_collision(filename, search_bytes, word1, word2, digest1, digest2);
 
 
                     /*output_word(word2, search_bytes);
@@ -198,11 +178,11 @@ void process_worker(int search_bytes, int match_bits)
                 printf("%d\n", match);
                 printf("s*8=%d\n", search_bytes * 8);*/
                 }
-                while (full_match(word2, word_end2, search_bytes) == 0);
+                while (word_match(word2, word_end2, search_bytes) == 0);
 
                 increment(word1, search_bytes);
             }
-            while (full_match(word1, word_end1, search_bytes) == 0);
+            while (word_match(word1, word_end1, search_bytes) == 0);
         }
     }
 
@@ -212,7 +192,7 @@ void process_worker(int search_bytes, int match_bits)
     free(word_end2);
 
 
-    printf("ID:%d;Stop worker\n", id);
+    printf("ID:%d;Stop worker\n", process_id);
 }
 
 
@@ -221,5 +201,60 @@ void output_word(unsigned char *word, int size)
     int i;
 
     for (i = 0; i < size; i++)
-        printf("%d ", word[i]);
+        printf("%02x", word[i]);
+}
+
+void rewrite_file(const char *filename)
+{
+    FILE *file = fopen(filename, "w");
+    fclose(file);
+}
+
+void output_collision(const char *filename, int size, unsigned char *word1, unsigned char *word2, unsigned char *digest1, unsigned char *digest2)
+{
+    int i;
+
+    for (i = 0; i < size; i++)
+        printf("%d ", word1[i]);
+
+    printf(";");
+
+    for (i = 0; i < 20; i++)
+        printf("%02x", digest1[i]);
+
+    printf("\n");
+
+    for (i = 0; i < size; i++)
+        printf("%d ", word2[i]);
+
+    printf(";");
+
+    for (i = 0; i < 20; i++)
+        printf("%02x", digest2[i]);
+
+    printf("\n\n");
+
+    FILE *file = fopen(filename, "a");
+
+    for (i = 0; i < size; i++)
+        fprintf(file, "%02x", word1[i]);
+
+    fprintf(file, ";");
+
+    for (i = 0; i < 20; i++)
+        fprintf(file, "%02x", digest1[i]);
+
+    fprintf(file, "\n");
+
+    for (i = 0; i < size; i++)
+        fprintf(file, "%02x", word2[i]);
+
+    fprintf(file, ";");
+
+    for (i = 0; i < 20; i++)
+        fprintf(file, "%02x", digest2[i]);
+
+    fprintf(file, "\n");
+
+    fclose(file);
 }
