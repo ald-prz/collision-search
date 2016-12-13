@@ -9,7 +9,7 @@
 #include "word_match.h"
 #include "increment.h"
 
-void process_host(int process_id, int process_num);
+void process_host(int process_id, int process_num, int search_bytes);
 void process_worker(int process_id, int search_bytes, int match_bits);
 void output_word(unsigned char *word, int size);
 void output_collision(const char *filename, int size, unsigned char *word1, unsigned char *word2, unsigned char *digest1, unsigned char *digest2);
@@ -18,10 +18,8 @@ void output_runtime(int *runtime, int size);
 
 /*
  * TODO:
- * 1) Outer iteration goes to 254.
- * 2) Optimize by calculating sha1-1 in the middle loop
- * 3) Disable all printf
- * 4) Try 16 processes once again
+ * 1) Disable all printf
+ * 2) Try 16 processes once again
 */
 int main(int argc, char *argv[])
 {
@@ -45,7 +43,7 @@ int main(int argc, char *argv[])
         else
         {
             if (process_id == 0)
-                process_host(process_id, process_num);
+                process_host(process_id, process_num, atoi(argv[2]));
             else
                 process_worker(process_id, atoi(argv[2]), atoi(argv[4]));
         }
@@ -57,11 +55,11 @@ int main(int argc, char *argv[])
 }
 
 
-void process_host(int process_id, int process_num)
+void process_host(int process_id, int process_num, int search_bytes)
 {
     unsigned char buff_char[2];
     int buff_int[1];
-    unsigned char byte;
+    unsigned char byte, target_byte;
     double time1, time2;
     int *runtime;
     int i;
@@ -70,6 +68,12 @@ void process_host(int process_id, int process_num)
     time1 = MPI_Wtime();
 
     printf("ID:%d;Start host\n", process_id);
+
+
+    if (search_bytes == 1)
+        target_byte = 254;
+    else
+        target_byte = 255;
 
     byte = 255; // to start from 0
 
@@ -83,7 +87,7 @@ void process_host(int process_id, int process_num)
         buff_char[1] = byte;
         MPI_Send(&buff_char, 2, MPI_UNSIGNED_CHAR, status.MPI_SOURCE, 0, MPI_COMM_WORLD);
     }
-    while (byte != 254);
+    while (byte != target_byte);
 
     printf("ID:%d;Recieving finish\n", process_id);
 
@@ -176,12 +180,12 @@ void process_worker(int process_id, int search_bytes, int match_bits)
             for (i = 1; i < search_bytes; i++)
                 word1[i] = 0;
 
-            // set word_end1 to [byte+1].255.255...255 form
+            // set word_end1 to [byte+1].0.0...0 form
 
             word_end1[0] = word1[0] + 1;
 
             for (i = 1; i < search_bytes; i++)
-                word_end1[i] = 255;
+                word_end1[i] = 0;
 
             /*printf("----word1=[");
             output_word(word1, search_bytes);
@@ -216,6 +220,8 @@ void process_worker(int process_id, int search_bytes, int match_bits)
                 output_word(word_end2, search_bytes);
                 printf("]\n");*/
 
+                SHA1(word1, search_bytes, digest1);
+
                 do
                 {
                     increment(word2, search_bytes);
@@ -223,7 +229,7 @@ void process_worker(int process_id, int search_bytes, int match_bits)
                     //output_word(word2, search_bytes);
                     //printf("\n");
 
-                    SHA1(word1, search_bytes, digest1);
+
                     SHA1(word2, search_bytes, digest2);
 
                     if (digest_match(digest1, digest2, match_bits) == 1)
@@ -294,7 +300,7 @@ void output_collision(const char *filename, int size, unsigned char *word1, unsi
     for (i = 0; i < size; i++)
         fprintf(file, "%02x", word2[i]);
 
-    fprintf(file, ";");
+    fprintf(file, ",");
 
     for (i = 0; i < 20; i++)
         fprintf(file, "%02x", digest2[i]);

@@ -1,5 +1,5 @@
 #!/bin/bash -l
-#PBS -l nodes=4:ppn=8
+#PBS -l nodes=2:ppn=8
 #PBS -l walltime=00:02:00
 #PBS -j oe
 #PBS -N AS-PG_short
