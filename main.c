@@ -16,6 +16,13 @@ void output_collision(const char *filename, int size, unsigned char *word1, unsi
 void rewrite_file(const char *filename);
 void output_runtime(int *runtime, int size);
 
+/*
+ * TODO:
+ * 1) Outer iteration goes to 254.
+ * 2) Optimize by calculating sha1-1 in the middle loop
+ * 3) Disable all printf
+ * 4) Try 16 processes once again
+*/
 int main(int argc, char *argv[])
 {
     int len;
