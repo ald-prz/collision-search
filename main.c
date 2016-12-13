@@ -169,7 +169,7 @@ void process_worker(int process_id, int search_bytes, int match_bits)
     {
         MPI_Send(&buff_char, 0, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
         MPI_Recv(&buff_char, 2, MPI_UNSIGNED_CHAR, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-        //printf("ID:%d;Status:%d;Work:%d\n", id, (int) msg[0], (int) msg[1]);
+        printf("ID:%d;Status:%d;Work:%d\n", process_id, (int) buff_char[0], (int) buff_char[1]);
 
         if (buff_char[0] == 1)
         {
@@ -180,12 +180,24 @@ void process_worker(int process_id, int search_bytes, int match_bits)
             for (i = 1; i < search_bytes; i++)
                 word1[i] = 0;
 
-            // set word_end1 to [byte+1].0.0...0 form
+            // set word_end1
 
-            word_end1[0] = word1[0] + 1;
+            if (buff_char[1] == 255)
+            {
+                word_end1[0] = buff_char[1];
 
-            for (i = 1; i < search_bytes; i++)
-                word_end1[i] = 0;
+                for (i = 1; i < search_bytes - 1; i++)
+                    word_end1[i] = 255;
+
+                word_end1[search_bytes - 1] = 254;
+            }
+            else
+            {
+                word_end1[0] = buff_char[1] + 1;
+
+                for (i = 1; i < search_bytes; i++)
+                    word_end1[i] = 0;
+            }
 
             /*printf("----word1=[");
             output_word(word1, search_bytes);
@@ -202,17 +214,11 @@ void process_worker(int process_id, int search_bytes, int match_bits)
                 for (i = 0; i < search_bytes; i++)
                     word2[i] = word1[i];
 
-                // set word_end2 to [byte].255.255...255 form
+                // set word_end2 to 255.255...255 form
 
-                if (search_bytes == 1)
-                    word_end2[0] = 255;
-                else
-                {
-                    word_end2[0] = word1[0];
+                for (i = 0; i < search_bytes; i++)
+                    word_end2[i] = 255;
 
-                    for (i = 1; i < search_bytes; i++)
-                        word_end2[i] = 255;
-                }
 
                 /*printf("--word2=[");
                 output_word(word2, search_bytes);
@@ -227,15 +233,13 @@ void process_worker(int process_id, int search_bytes, int match_bits)
                     increment(word2, search_bytes);
 
                     //output_word(word2, search_bytes);
-                    //printf("\n");
-
+                    //printf("\n");                    
 
                     SHA1(word2, search_bytes, digest2);
 
                     if (digest_match(digest1, digest2, match_bits) == 1)
-                        if (word_match(word1, word2, search_bytes) != 1)
-                            output_collision(filename, search_bytes, word1, word2, digest1, digest2);
-
+                        //if (word_match(word1, word2, search_bytes) != 1)
+                        output_collision(filename, search_bytes, word1, word2, digest1, digest2);
 
                     /*output_word(word2, search_bytes);
                 printf(" ??? ");
