@@ -169,7 +169,7 @@ void process_worker(int process_id, int search_bytes, int match_bits)
     {
         MPI_Send(&buff_char, 0, MPI_UNSIGNED_CHAR, 0, 0, MPI_COMM_WORLD);
         MPI_Recv(&buff_char, 2, MPI_UNSIGNED_CHAR, 0, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
-        printf("ID:%d;Status:%d;Work:%d\n", process_id, (int) buff_char[0], (int) buff_char[1]);
+        printf("ID:%d;Work:%d\n", process_id, (int)buff_char[1]);
 
         if (buff_char[0] == 1)
         {
@@ -241,13 +241,13 @@ void process_worker(int process_id, int search_bytes, int match_bits)
                         //if (word_match(word1, word2, search_bytes) != 1)
                         output_collision(filename, search_bytes, word1, word2, digest1, digest2);
 
-                    /*output_word(word2, search_bytes);
-                printf(" ??? ");
-                output_word(word_end2, search_bytes);
-                printf("\n");
+//                    output_word(word2, search_bytes);
+//                    printf(" ??? ");
+//                    output_word(word_end2, search_bytes);
+//                    printf("\n");
 
-                printf("%d\n", match);
-                printf("s*8=%d\n", search_bytes * 8);*/
+//                    printf("%d\n", match);
+//                    printf("s*8=%d\n", search_bytes * 8);
                 }
                 while (word_match(word2, word_end2, search_bytes) == 0);
 
@@ -294,7 +294,7 @@ void output_collision(const char *filename, int size, unsigned char *word1, unsi
     for (i = 0; i < size; i++)
         fprintf(file, "%02x", word1[i]);
 
-    fprintf(file, ";");
+    fprintf(file, ",");
 
     for (i = 0; i < 20; i++)
         fprintf(file, "%02x", digest1[i]);
