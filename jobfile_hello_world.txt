@@ -1,0 +1,13 @@
+#!/bin/bash -l
+#PBS -l nodes=4:ppn=8
+#PBS -l walltime=00:02:00
+#PBS -l mem=2kb
+#PBS -j oe
+#PBS -N Hello
+#PBS -o hello_out.txt
+echo "Running job on $HOST - " $(date)
+module load openmpi/1.4.3/gcc/4.6.1
+cd $HOME/
+mpiCC hello_world.c -o hello
+mpirun ./hello
+echo "Done"

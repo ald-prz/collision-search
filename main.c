@@ -27,6 +27,8 @@ int main(int argc, char *argv[])
     MPI_Comm_size(MPI_COMM_WORLD, &process_num);
     MPI_Get_processor_name(processor_name, &len);
 
+    printf("start");
+
     if (argc < 5)
        printf("Arguments are not provided");
     else
@@ -60,7 +62,7 @@ void process_host(int process_id, int process_num)
 
     time1 = MPI_Wtime();
 
-    //printf("ID:%d;Start host\n", process_id);
+    printf("ID:%d;Start host\n", process_id);
 
     byte = 255; // to start from 0
 
@@ -76,7 +78,7 @@ void process_host(int process_id, int process_num)
     }
     while (byte != 254);
 
-    //printf("ID:%d;Recieving finish\n", process_id);
+    printf("ID:%d;Recieving finish\n", process_id);
 
     // sending finish commands
 
@@ -88,7 +90,7 @@ void process_host(int process_id, int process_num)
         MPI_Send(&buff_char, 2, MPI_UNSIGNED_CHAR, status.MPI_SOURCE, 0, MPI_COMM_WORLD);
     }
 
-    //printf("ID:%d;Recieving runtime\n", process_id);
+    printf("ID:%d;Recieving runtime\n", process_id);
 
     // recieving runtimes
 
@@ -101,7 +103,7 @@ void process_host(int process_id, int process_num)
     }
 
 
-    //printf("ID:%d;Output\n", process_id);
+    printf("ID:%d;Output\n", process_id);
 
     time2 = MPI_Wtime();
     runtime[0] = (int) (time2 - time1);
@@ -112,7 +114,7 @@ void process_host(int process_id, int process_num)
 
     free(runtime);
 
-    //printf("ID:%d;Stop host\n", process_id);
+    printf("ID:%d;Stop host\n", process_id);
 }
 
 void output_runtime(int *runtime, int size)
@@ -150,7 +152,7 @@ void process_worker(int process_id, int search_bytes, int match_bits)
 
     rewrite_file(filename);
 
-    //printf("ID:%d;Start worker\n", process_id);
+    printf("ID:%d;Start worker\n", process_id);
 
     while (buff_char[0] == 1) // the host orders to continue to work
     {
@@ -248,7 +250,7 @@ void process_worker(int process_id, int search_bytes, int match_bits)
     free(word_end2);
 
 
-    //printf("ID:%d;Stop worker\n", process_id);
+    printf("ID:%d;Stop worker\n", process_id);
 }
 
 
