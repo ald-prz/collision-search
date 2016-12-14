@@ -7,5 +7,5 @@
 echo "Running job on $HOST - " 'date'
 module load openmpi/1.4.3/gcc/4.1.2
 mpiCC main.c digest_match.c increment.c word_match.c -o collisionSearch -lcrypto
-mpirun ./collisionSearch -b 3 -n 40
+mpirun ./collisionSearch -b 3 -n 64
 echo "Done"
